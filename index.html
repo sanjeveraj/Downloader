@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YTDL — YouTube Downloader</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --border: #1e1e2e;
+      --accent: #ff3c3c;
+      --accent2: #ff7a3c;
+      --text: #f0f0f5;
+      --muted: #6b6b80;
+      --card: #141420;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,60,60,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,60,60,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow orb */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 500px;
+      background: radial-gradient(ellipse, rgba(255,60,60,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 60px 24px 100px;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-text {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text span { color: var(--accent); }
+
+    h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -2px;
+      margin-bottom: 16px;
+    }
+
+    h1 .line2 {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 15px;
+      letter-spacing: 0.3px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* Input area */
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 28px;
+      transition: border-color 0.3s;
+    }
+
+    .input-card:focus-within {
+      border-color: rgba(255, 60, 60, 0.4);
+      box-shadow: 0 0 40px rgba(255,60,60,0.06);
+    }
+
+    .input-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 14px;
+      font-family: 'DM Mono', monospace;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    .btn-fetch {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 24px;
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: transform 0.15s, background 0.2s, box-shadow 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-fetch:hover {
+      background: #ff5555;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 30px rgba(255,60,60,0.3);
+    }
+
+    .btn-fetch:active { transform: translateY(0); }
+    .btn-fetch:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Loading state */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Video info card */
+    #info-card {
+      display: none;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      animation: fadeUp 0.4s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .video-meta {
+      display: flex;
+      gap: 18px;
+      padding: 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .thumbnail {
+      width: 130px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 10px;
+      flex-shrink: 0;
+      background: var(--border);
+    }
+
+    .video-details { flex: 1; min-width: 0; }
+
+    .video-title {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.35;
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .video-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .video-stats span::before { margin-right: 4px; }
+
+    /* Formats */
+    .formats-section { padding: 22px; }
+
+    .formats-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .formats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .format-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+    }
+
+    .format-btn:hover {
+      border-color: var(--accent);
+      background: rgba(255,60,60,0.06);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255,60,60,0.12);
+    }
+
+    .format-res {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .format-res.audio { font-size: 13px; color: var(--accent2); }
+
+    .format-meta {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .download-icon {
+      font-size: 20px;
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    /* Progress / status */
+    #status {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      animation: fadeUp 0.3s ease;
+    }
+
+    #status.error {
+      border-color: rgba(255,60,60,0.4);
+      background: rgba(255,60,60,0.06);
+      color: #ff7a7a;
+    }
+
+    #status.success {
+      border-color: rgba(60,200,100,0.4);
+      background: rgba(60,200,100,0.06);
+      color: #6eda8e;
+    }
+
+    .progress-bar-wrap {
+      background: var(--border);
+      border-radius: 4px;
+      height: 4px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.3s;
+      animation: shimmer 1.5s infinite;
+      background-size: 200% 100%;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'DM Mono', monospace;
+      margin-top: 60px;
+    }
+
+    @media (max-width: 500px) {
+      .input-row { flex-direction: column; }
+      .video-meta { flex-direction: column; }
+      .thumbnail { width: 100%; height: 160px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">▶</div>
+        <div class="logo-text">YT<span>DL</span></div>
+      </div>
+      <h1>Download YouTube<br><span class="line2">in Full Quality</span></h1>
+      <p class="subtitle">// paste url · choose quality · download instantly</p>
+    </header>
+
+    <div class="input-card">
+      <div class="input-label">YouTube URL</div>
+      <div class="input-row">
+        <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=..." />
+        <button class="btn-fetch" id="fetch-btn" onclick="fetchInfo()">Fetch Video</button>
+      </div>
+    </div>
+
+    <div id="status"></div>
+
+    <div id="info-card">
+      <div class="video-meta">
+        <img class="thumbnail" id="thumbnail" src="" alt="thumbnail" />
+        <div class="video-details">
+          <div class="video-title" id="video-title">—</div>
+          <div class="video-stats">
+            <span id="video-duration">—</span>
+            <span id="video-uploader">—</span>
+            <span id="video-views">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="formats-section">
+        <div class="formats-label">Select Format to Download</div>
+        <div class="formats-grid" id="formats-grid"></div>
+      </div>
+    </div>
+
+    <footer>Built with Flask + yt-dlp &nbsp;·&nbsp; For personal use only</footer>
+  </div>
+
+  <script>
+    let currentUrl = '';
+
+    function setStatus(msg, type = 'info') {
+      const el = document.getElementById('status');
+      el.style.display = 'block';
+      el.className = type;
+      el.innerHTML = msg;
+    }
+
+    function hideStatus() {
+      document.getElementById('status').style.display = 'none';
+    }
+
+    function formatDuration(secs) {
+      if (!secs) return '';
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function formatViews(n) {
+      if (!n) return '';
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M views';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K views';
+      return n + ' views';
+    }
+
+    async function fetchInfo() {
+      const url = document.getElementById('url-input').value.trim();
+      if (!url) { setStatus('⚠ Please paste a YouTube URL first.', 'error'); return; }
+
+      currentUrl = url;
+      const btn = document.getElementById('fetch-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Fetching...';
+      document.getElementById('info-card').style.display = 'none';
+      setStatus('<span class="spinner"></span> Fetching video info...');
+
+      try {
+        const res = await fetch('/info', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+
+        if (data.error) { setStatus('✖ ' + data.error, 'error'); return; }
+
+        // Populate
+        document.getElementById('thumbnail').src = data.thumbnail || '';
+        document.getElementById('video-title').textContent = data.title || 'Unknown Title';
+        document.getElementById('video-duration').textContent = '⏱ ' + formatDuration(data.duration);
+        document.getElementById('video-uploader').textContent = '👤 ' + (data.uploader || '');
+        document.getElementById('video-views').textContent = formatViews(data.view_count);
+
+        const grid = document.getElementById('formats-grid');
+        grid.innerHTML = '';
+
+        (data.formats || []).forEach(f => {
+          const isAudio = !f.resolution.endsWith('p');
+          const btn2 = document.createElement('button');
+          btn2.className = 'format-btn';
+          btn2.innerHTML = `
+            <span class="download-icon">${isAudio ? '🎵' : '🎬'}</span>
+            <div class="format-res ${isAudio ? 'audio' : ''}">${isAudio ? 'MP3' : f.resolution}</div>
+            <div class="format-meta">${f.ext.toUpperCase()}${f.fps ? ' · ' + f.fps + 'fps' : ''}${f.size ? ' · ~' + f.size + 'MB' : ''}</div>
+          `;
+          btn2.onclick = () => startDownload(f);
+          grid.appendChild(btn2);
+        });
+
+        document.getElementById('info-card').style.display = 'block';
+        hideStatus();
+      } catch (e) {
+        setStatus('✖ Network error: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Fetch Video';
+      }
+    }
+
+    async function startDownload(format) {
+      setStatus(`<span class="spinner"></span> Preparing download — <b>${format.resolution}</b>...<div class="progress-bar-wrap"><div class="progress-bar" style="width:60%;"></div></div>`);
+
+      try {
+        const isAudio = !format.resolution.endsWith('p');
+        const res = await fetch('/download', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            url: currentUrl,
+            format_id: format.format_id,
+            is_audio: isAudio
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          setStatus('✖ ' + (err.error || 'Download failed'), 'error');
+          return;
+        }
+
+        // Trigger browser download
+        const blob = await res.blob();
+        const disposition = res.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        const filename = match ? match[1] : 'video.mp4';
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        setStatus('✔ Download started! Check your downloads folder.', 'success');
+      } catch (e) {
+        setStatus('✖ Error: ' + e.message, 'error');
+      }
+    }
+
+    // Allow Enter key
+    document.getElementById('url-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') fetchInfo();
+    });
+
+    // Auto-paste detection
+    document.getElementById('url-input').addEventListener('paste', () => {
+      setTimeout(() => {
+        if (document.getElementById('url-input').value.includes('youtube.com') ||
+            document.getElementById('url-input').value.includes('youtu.be')) {
+          fetchInfo();
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>
